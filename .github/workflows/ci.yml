@@ -1,0 +1,176 @@
+# https://github.com/actions-rs/example/blob/23ffb1bf0016f41999902ba7542b4f1bb1a89c48/.github/workflows/quickstart.yml#L4
+name: CI
+on:
+  push:
+    branches:
+      - main
+    # See:
+    # https://stackoverflow.com/questions/62968897/is-it-possible-to-not-run-github-action-for-readme-updates
+    # and
+    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#example-excluding-paths
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+
+      - name: Run cargo test with backtrace
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: -- --nocapture
+        env:
+          RUST_BACKTRACE: 1
+  lints:
+    name: Lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
+
+  release:
+    runs-on: macos-latest
+    needs:
+      - test
+      - lints
+      - check
+    outputs:
+      new_version: ${{ steps.check_for_version_changes.outputs.new_version }}
+      changed: ${{ steps.check_for_version_changes.outputs.changed }}
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          # https://stackoverflow.com/questions/65944700/how-to-run-git-diff-in-github-actions
+          # TLDR – By default this action fetches no history.
+          # We need a bit of history to be able to check if we've recently updated the version in Cargo.toml
+          fetch-depth: 2
+      - name: Update local toolchain
+        run: |
+          rustup update
+          rustup component add clippy
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+      - name: Toolchain info
+        run: |
+          cargo --version --verbose
+          rustc --version
+          cargo clippy --version
+      - name: Build
+        run: cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin
+      - name: Check for version changes in Cargo.toml
+        id: check_for_version_changes
+        run: |
+          # When there are no changes, VERSION_CHANGES will be empty
+          # Without the echo, this command would exit with a 1, causing the GitHub Action to fail
+          # Instead, we want it to succeed, but just evaluate `changed=false` in the other branch of the conditional
+          VERSION_CHANGES=$(git diff HEAD~1 HEAD Cargo.toml | grep "\+version" || echo "")
+          if [[ -n $VERSION_CHANGES ]]; then
+            NEW_VERSION=$(echo $VERSION_CHANGES | awk -F'"' '{print $2}')
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: cargo publish and create GitHub Release if current commit has updated the version in Cargo.toml
+        if: steps.check_for_version_changes.outputs.changed == 'true'
+        run: |
+          # This combines the intel and m1 binaries into a single binary
+          lipo -create -output target/packs target/aarch64-apple-darwin/release/packs target/x86_64-apple-darwin/release/packs
+
+          # Creates artifact for homebrew. -C means run from `target` directory
+          tar -czf target/packs-mac.tar.gz -C target packs
+
+          gh release create v${{steps.check_for_version_changes.outputs.new_version}} --target "${{ github.sha }}" --generate-notes
+
+          # This uploads the raw binary
+          gh release upload v${{steps.check_for_version_changes.outputs.new_version}} target/packs
+
+          # This tarball is a binary that is executable
+          gh release upload v${{steps.check_for_version_changes.outputs.new_version}} target/packs-mac.tar.gz
+
+          cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Skip publishing
+        if: steps.check_for_version_changes.outputs.changed == 'false'
+        run: |
+          echo "No diff to the version found in Cargo.toml. Skipping publishing."
+  upload-linux-bin:
+    needs: release
+    if: github.ref == 'refs/heads/main' && ${{needs.release.outputs.changed}} == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update local toolchain
+        run: |
+          rustup update
+          rustup target add x86_64-unknown-linux-gnu
+      - name: Build
+        run: cargo build --release --target x86_64-unknown-linux-gnu  
+      - name: Upload linux binary
+        run: |
+          tar -czf target/packs-linux-unknown.tar.gz -C target/x86_64-unknown-linux-gnu/release pks packs
+          gh release upload v$NEW_VERSION target/packs-linux-unknown.tar.gz
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ needs.release.outputs.new_version }}
+
+    

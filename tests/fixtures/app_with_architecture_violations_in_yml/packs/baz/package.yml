@@ -1,0 +1,4 @@
+enforce_privacy: true
+enforce_architecture: true
+dependencies:
+  - packs/bar
