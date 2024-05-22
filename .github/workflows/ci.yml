@@ -107,7 +107,7 @@ jobs:
           # This tarball is a binary that is executable
           gh release upload v${{steps.check_for_version_changes.outputs.new_version}} target/packs-mac.tar.gz
 
-          cargo publish
+          #cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
