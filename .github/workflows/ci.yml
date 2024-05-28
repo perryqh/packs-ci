@@ -160,7 +160,7 @@ jobs:
       - release
       - upload-linux-bin
       - upload-mac-universal-bin
-    if: github.ref == 'refs/heads/main' && ${{needs.release.outputs.changed}} == 'true'
+    if: success() && github.ref == 'refs/heads/main' && ${{needs.release.outputs.changed}} == 'true'
     runs-on: ubuntu-latest
     
     steps:
