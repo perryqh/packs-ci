@@ -4,19 +4,23 @@
         "platforms": {
           "macos-x86_64": {
             "regex": "^packs-mac",
-            "path": "packs"
+            "path": "packs",
+            "format": "tar.gz"
           },
           "macos-aarch64": {
             "regex": "^packs-mac",
-            "path": "packs"
+            "path": "packs",
+            "format": "tar.gz"
           },
           "linux-x86_64": {
             "regex": "^x86_64-unknown-linux",
-            "path": "packs"
+            "path": "packs",
+            "format": "tar.gz"
           },
           "linux--aarch64": {
             "regex": "^aarch64-unknown-linux",
-            "path": "packs" 
+            "path": "packs",
+            "format": "tar.gz"
           }
         }
       }
