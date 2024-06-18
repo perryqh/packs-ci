@@ -134,7 +134,7 @@ jobs:
 
   upload-linux-bin:
     needs: release
-    if: ${{needs.release.outputs.new_version}} != ''
+    if: ${{needs.release.outputs.new_version}}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,7 +161,7 @@ jobs:
       - release
       - upload-linux-bin
       - upload-mac-universal-bin
-    if: success() && ${{needs.release.outputs.changed}} == 'true'
+    if: success() && ${{needs.release.outputs.new_version}}
     runs-on: ubuntu-latest
     
     steps:
