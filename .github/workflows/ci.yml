@@ -108,7 +108,7 @@ jobs:
   upload-mac-universal-bin:
     needs: release
     runs-on: macos-latest
-    if: ${{needs.release.outputs.new_version}} != ''
+    if: ${{needs.release.outputs.new_version}}
     steps:
       - uses: actions/checkout@v3
       - name: Build
