@@ -110,6 +110,10 @@ jobs:
     runs-on: macos-latest
     if: ${{needs.release.outputs.changed}} == 'true'
     steps:
+      - name: print steps
+        run: |
+          echo $NEW_VERSION
+          echo ${{needs.release.outputs.changed}}
       - uses: actions/checkout@v3
       - name: Build
         run: cargo build --release --target aarch64-apple-darwin --target x86_64-apple-darwin
