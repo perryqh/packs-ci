@@ -114,6 +114,8 @@ jobs:
         run: |
           echo "NEW_VERSION"
           echo $NEW_VERSION
+          echo ${{ needs.release.outputs }}
+          echo ${{ needs.release.outputs.new_version }}
           echo ${{needs.release.outputs.changed}}
       - uses: actions/checkout@v3
       - name: Build
